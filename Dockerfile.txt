@@ -2,17 +2,14 @@ FROM "ubuntu"
 RUN apt-get update && yes | apt-get upgrade
 RUN mkdir -p /tensorflow/models
 RUN apt-get install -y git python-pip
-RUN pip install tensorflow-gpu
+# sometimes there is low memory erro occurs. If so use pip install --no-cache-dir tensorflow.
+RUN pip install tensorflow 
 RUN pip install Cython
 RUN pip install contextlib2
 RUN apt-get install -y protobuf-compiler python-pil python-lxml
 RUN pip install jupyter
-RUN apt-get install python-tk
-RUN pip install matplotlib==2.2.3
+RUN pip install matplotlib
 RUN git clone https://github.com/tensorflow/models.git /tensorflow/models
 WORKDIR /tensorflow/models/research
 RUN protoc object_detection/protos/*.proto --python_out=.
 RUN export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
-
-
-### This file is to install required library in Docker container
