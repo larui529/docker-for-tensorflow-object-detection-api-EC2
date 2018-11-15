@@ -16,10 +16,47 @@ docker run -it tf-od
 
 3. export path and test the installation
 ```bash
+# From tensorflow/models/rsearch
 export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
 python object_detection/builders/model_builder_test.py
 ```
 
 if you see "Ran 22 tests in X.XXXs \n OK". That means your environment is ready. 
 
-4
+4. install wget (could be added to Dockerfile)
+```bash
+apt-get install wget
+```
+5. Download pretrained model and public training data
+
+```bash
+# From tensorflow/models/rsearch/object_detection
+wget http://download.tensorflow.org/models/object_detection/faster_rcnn_inception_v2_coco_2018_01_28.tar.gz
+tar -xvzf faster_rcnn_inception_v2_coco_2018_01_28.tar.gz
+rm faster_rcnn_inception_v2_coco_2018_01_28.tar.gz
+git clone https://github.com/larui529/tensowflow-od-aws-ec2.git
+cp -r tensowflow-od-aws-ec2/* .
+rm -f -R tensowflow-od-aws-ec2
+```
+6. Install pandas (could be added to Dockerfile)
+```bash
+pip install pandas
+```
+
+7. Generate tfrecord files
+```bash
+# From tensorflow/models/research/object_detection
+chmod -R 777 ~/tensorflow/*
+python generate_tfrecord.py --csv_input=images/train_labels.csv --image_dir=images/train/ --output_path=train.record
+python generate_tfrecord.py --csv_input=images/test_labels.csv --image_dir=images/test --output_path=test.record
+```
+
+8. Change path in training/faster_rcnn_inception_v2_pets.config (5 places. search (F6) tensorflow)
+
+9. Run the training code
+```bash
+# From tensorflow/models/research/object_detection
+python legacy/train.py --logtostderr --train_dir=training/ --pipeline_config_path=training/faster_rcnn_inception_v2_pets.config
+```
+
+
