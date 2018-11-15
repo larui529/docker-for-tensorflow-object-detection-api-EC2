@@ -1,7 +1,20 @@
-# docker-for-tensorflow-object-detection-api-EC2
+# How to build up a docker image for tensorflow object detection api training on AWS EC2 instance
 
+## Brief summary
+
+This is a tutorial and trail to deploy an training work on AWS EC2 instance. The tutorial include how to set up tensorflow environment and how to download public training dataset and how to export inference graph for serving. 
 
 1. Use SageMaker instance. (or choose a large memory EC2 instance since the small memory will cause error in installing tensorflow)
+
+```bash
+sudo su
+yum update
+yum upgrade
+mkdir -p test/model
+cd test/model
+nano Dockerfile 
+# paste Dockerfile content from github to the nano file
+# exit the file
 
 2. build docker image from Dockefile located folder 
 
