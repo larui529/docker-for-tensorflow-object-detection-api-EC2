@@ -5,6 +5,8 @@
 This is a tutorial and trail to deploy an training work on AWS EC2 instance. The tutorial include how to set up tensorflow environment and how to download public training dataset and how to export inference graph for serving. 
 
 1. Use SageMaker instance. (or choose a large memory EC2 instance since the small memory will cause error in installing tensorflow)
+You can use GPU is the EC2 instance type is 'p2' 
+change Dockerfile line 6 from 'install tensorflow' to 'install tensorflow-gpu'
 
 ```bash
 sudo su
@@ -13,6 +15,9 @@ yum upgrade
 mkdir -p test/model
 cd test/model
 nano Dockerfile 
+# Test nvidia-smi with the latest official CUDA image
+docker run --runtime=nvidia --rm nvidia/cuda:9.0-base nvidia-smi
+```
 # paste Dockerfile content from github to the nano file
 # exit the file
 
@@ -65,6 +70,7 @@ python generate_tfrecord.py --csv_input=images/test_labels.csv --image_dir=image
 ```
 
 8. Change path in training/faster_rcnn_inception_v2_pets.config (5 places. search (F6) tensorflow)
+delete from /home/ec2-user/ 
 
 9. Run the training code
 ```bash
