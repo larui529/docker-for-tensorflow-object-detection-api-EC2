@@ -3,7 +3,7 @@ RUN apt-get update && yes | apt-get upgrade
 RUN mkdir -p /tensorflow/models
 RUN apt-get install -y git python-pip
 # sometimes there is low memory erro occurs. If so use pip install --no-cache-dir tensorflow.
-RUN pip install tensorflow 
+RUN pip install tensorflow
 RUN pip install Cython
 RUN pip install contextlib2
 RUN apt-get install -y protobuf-compiler python-pil python-lxml
@@ -11,11 +11,189 @@ RUN pip install jupyter
 RUN pip install matplotlib
 RUN git clone https://github.com/tensorflow/models.git /tensorflow/models
 WORKDIR /tensorflow/models/research
-RUN apt-get install wget 
-RUN apt-get install pandas
+RUN protoc object_detection/protos/*.proto --python_out=.
+RUN export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
+
+
+# The above code works fine for t2.micro using docker build
+
+FROM "ubuntu"
+RUN apt-get update && yes | apt-get upgrade
+RUN mkdir -p /tensorflow/models
+RUN apt-get install -y git python-pip
+# sometimes there is low memory erro occurs. If so use pip install --no-cache-dir tensorflow.
+RUN pip install tensorflow-gpu
+RUN pip install Cython
+RUN pip install contextlib2
+RUN apt-get install -y protobuf-compiler python-pil python-lxml
+RUN pip install jupyter
+RUN pip install matplotlib
+RUN git clone https://github.com/tensorflow/models.git /tensorflow/models
+WORKDIR /tensorflow/models/research
+RUN protoc object_detection/protos/*.proto --python_out=.
+RUN export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
+
+
+
+this works for p2.xlarge in building using nvidia-build 
+let's try if it can used for training
+result: I can't import tensorflow gpu even though I installed it. Which
+means I need to use cuda and cudnn docker file or tensorflow gpu docker file
+
+Now let's try to modify the source docker image
+FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
+RUN apt-get update && yes | apt-get upgrade
+RUN mkdir -p /tensorflow/models
+RUN apt-get install -y git python-pip
+RUN apt-get install nano
+# sometimes there is low memory erro occurs. If so use pip install --no-cache-dir tensorflow.
+RUN pip install --upgrade pip
+RUN pip install tensorflow-gpu
+RUN pip install Cython
+RUN pip install contextlib2
+RUN pip install pandas
+RUN apt-get install -y protobuf-compiler python-pil python-lxml
+RUN pip install jupyter
+RUN pip install matplotlib
+RUN git clone https://github.com/tensorflow/models.git /tensorflow/models
+WORKDIR /tensorflow/models/research
+RUN apt-get install wget unzip
 RUN wget -O protobuf.zip https://github.com/google/protobuf/releases/download/v3.0.0/protoc-3.0.0-linux-x86_64.zip
 RUN unzip protobuf.zip
 RUN ./bin/protoc object_detection/protos/*.proto --python_out=.
 RUN export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
 
+now let's see if it can work with nvidia docker build
+it worked. Let's see if we can train on this object_detection
+
+it failed with the following error 
+
+ImportError: libcublas.so.9.0: cannot open shared object file: No such file or directory
+
+Maybe I need to use cuda 9.0 instead of 8.0
+
+Now let's change cuda to 9.0 cudnn7 and it worked with tensorflow
+passed model_builder_test.py
+
+And finally I got the training work. HAHAHA
+Need to add pandas and nano to the dockerfile
+
+I found this nvidia docker hub and we can find pre-built docker image from here
+https://hub.docker.com/r/nvidia/cuda/
+
+Now let's tweek the Dockerfile to make it more efficient:
+
+FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
+RUN apt-get update && yes | apt-get upgrade
+RUN mkdir -p /tensorflow/models
+RUN apt-get install -y git python-pip
+RUN apt-get install -y protobuf-compiler \
+                       python-pil \
+                       python-lxml \
+                       wget \
+                       unzip \
+                       nano
+RUN pip install --upgrade pip
+RUN pip install \
+        tensorflow-gpu \
+        Cython \
+        contextlib2 \ 
+        pandas \ 
+        matplotlib \ 
+        jupyter 
+
+RUN git clone https://github.com/tensorflow/models.git /tensorflow/models
+WORKDIR /tensorflow/models/research
+RUN wget -O protobuf.zip https://github.com/google/protobuf/releases/download/v3.0.0/protoc-3.0.0-linux-x86_64.zip
+RUN unzip protobuf.zip
+RUN ./bin/protoc object_detection/protos/*.proto --python_out=.
+ENV     PYTHONPATH $PYTHONPATH:/opt/tensorflow-models/research:/opt/tensorflow-models/research/slim
+
+
+It workded 
+
+
+
+
+
+
 # use nvidia-docker run -it {docker image}  
+
+Pre-built docker image tried: 
+
+FROM nvidia/cuda:8.0-cudnn6-devel-ubuntu16.04
+
+tried the following docker file
+
+FROM nvidia/cuda:8.0-cudnn6-devel-ubuntu16.04
+
+MAINTAINER origox
+
+# TF dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        libfreetype6-dev \
+        libpng12-dev \
+        libzmq3-dev \
+        pkg-config \
+        python \
+        python-dev \
+        rsync \
+        software-properties-common \
+        unzip \
+        git \
+        protobuf-compiler \
+        && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
+    python get-pip.py && \
+    rm get-pip.py
+
+RUN pip --no-cache-dir install \
+        tensorflow-gpu \
+        pillow \
+        lxml \
+        h5py \
+        ipykernel \
+        jupyter \
+        matplotlib \
+        numpy \
+        pandas \
+        scipy \
+        sklearn \
+        && \
+    python -m ipykernel.kernelspec
+
+RUN  protoc --version 
+
+RUN git clone https://github.com/tensorflow/models.git /opt/tensorflow-models
+WORKDIR /opt/tensorflow-models/research    
+RUN     protoc object_detection/protos/*.proto --python_out=.
+ENV     PYTHONPATH $PYTHONPATH:/opt/tensorflow-models/research:/opt/tensorflow-models/research/slim
+
+# Set up our notebook config.
+####COPY jupyter_notebook_config.py /root/.jupyter/
+
+# Copy sample notebooks.
+####COPY notebooks /notebooks
+
+# Jupyter has issues with being run directly:
+#   https://github.com/ipython/ipython/issues/7062
+# We just add a little wrapper script.
+####COPY run_jupyter.sh /
+
+    # For CUDA profiling, TensorFlow requires CUPTI.
+ENV LD_LIBRARY_PATH /usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
+
+# TensorBoard
+EXPOSE 6006
+# IPython
+EXPOSE 8888
+
+#### WORKDIR "/notebooks"
+
+CMD ["python", "object_detection/builders/model_builder_test.py"]
+
