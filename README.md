@@ -80,7 +80,7 @@ docker rm $(docker ps -a -q)
 docker rmi $(docker images -q)
 ```
 
-# Start docker container
+## Start docker container
 Run the docker image to generate a container
 ```bash
 nvidia-docker run -it tf-od
